@@ -1,0 +1,179 @@
+starting single_client_streaming_text...
+completed single_client_streaming_text [PASS] in 5.2s
+starting multiple_concurrent_text...
+completed multiple_concurrent_text [PASS] in 33.7s
+starting burst_exceeds_admission_capacity...
+completed burst_exceeds_admission_capacity [PASS] in 5.0s
+starting disconnect_after_first_chunk...
+completed disconnect_after_first_chunk [PASS] in 1.8s
+{
+  "target": "http://127.0.0.1:8000",
+  "queue_capacity": 10,
+  "clients": 6,
+  "burst_extra": 4,
+  "repeats": 3,
+  "scenarios": [
+    {
+      "name": "single_client_streaming_text",
+      "ok": true,
+      "notes": [
+        "first audio after first part in 44.2 ms (2 chunks before remaining text); 9 parts (3x); 530 chunks total in sequences [0, 1, 2, 3, 4, 5, 6, 7]..."
+      ],
+      "overloads": 0,
+      "failures": [],
+      "streams": 1,
+      "completed_audio": 1,
+      "time_to_first_audio": {
+        "count": 1,
+        "min_ms": 44.2,
+        "max_ms": 44.2,
+        "mean_ms": 44.2,
+        "p95_ms": 44.2
+      },
+      "chunk_gaps": {
+        "count": 529,
+        "min_ms": 4.6,
+        "max_ms": 35.0,
+        "mean_ms": 9.7,
+        "p95_ms": 13.7
+      },
+      "playback_stalls": {
+        "count": 0,
+        "total_ms": 0.0,
+        "longest_ms": 0.0
+      },
+      "elapsed_s": 5.17
+    },
+    {
+      "name": "multiple_concurrent_text",
+      "ok": true,
+      "notes": [
+        "6 clients completed independent streams (9 parts, 3x)"
+      ],
+      "overloads": 0,
+      "failures": [],
+      "streams": 6,
+      "completed_audio": 6,
+      "time_to_first_audio": {
+        "count": 6,
+        "min_ms": 35.3,
+        "max_ms": 4313.8,
+        "mean_ms": 2370.3,
+        "p95_ms": 4313.8
+      },
+      "chunk_gaps": {
+        "count": 3218,
+        "min_ms": 4.8,
+        "max_ms": 4112.1,
+        "mean_ms": 55.5,
+        "p95_ms": 15.5
+      },
+      "playback_stalls": {
+        "count": 2,
+        "total_ms": 978.3,
+        "longest_ms": 533.8
+      },
+      "elapsed_s": 33.72
+    },
+    {
+      "name": "burst_exceeds_admission_capacity",
+      "ok": true,
+      "notes": [
+        "capacity=10; in-flight 11 succeeded; overloads=3; overloads counted separately from failures",
+        "resumed a full stream after burst drained (queued=0, active_jobs=0)"
+      ],
+      "overloads": 3,
+      "failures": [],
+      "streams": 15,
+      "completed_audio": 12,
+      "time_to_first_audio": {
+        "count": 12,
+        "min_ms": 32.0,
+        "max_ms": 4352.5,
+        "mean_ms": 1986.2,
+        "p95_ms": 4352.5
+      },
+      "chunk_gaps": {
+        "count": 400,
+        "min_ms": 6.2,
+        "max_ms": 31.0,
+        "mean_ms": 11.1,
+        "p95_ms": 19.5
+      },
+      "playback_stalls": {
+        "count": 0,
+        "total_ms": 0.0,
+        "longest_ms": 0.0
+      },
+      "elapsed_s": 4.96
+    },
+    {
+      "name": "disconnect_after_first_chunk",
+      "ok": true,
+      "notes": [
+        "dropping client left after first binary chunk; surviving client completed 177 chunks"
+      ],
+      "overloads": 0,
+      "failures": [],
+      "streams": 2,
+      "completed_audio": 1,
+      "time_to_first_audio": {
+        "count": 2,
+        "min_ms": 31.8,
+        "max_ms": 103.0,
+        "mean_ms": 67.4,
+        "p95_ms": 103.0
+      },
+      "chunk_gaps": {
+        "count": 179,
+        "min_ms": 5.3,
+        "max_ms": 38.8,
+        "mean_ms": 9.6,
+        "p95_ms": 12.4
+      },
+      "playback_stalls": {
+        "count": 0,
+        "total_ms": 0.0,
+        "longest_ms": 0.0
+      },
+      "elapsed_s": 1.81
+    }
+  ],
+  "totals": {
+    "ok": true,
+    "overloads": 3,
+    "failures": [],
+    "time_to_first_audio": {
+      "count": 21,
+      "min_ms": 31.8,
+      "max_ms": 4352.5,
+      "mean_ms": 1820.7,
+      "p95_ms": 4348.6
+    },
+    "chunk_gaps": {
+      "count": 4326,
+      "min_ms": 4.6,
+      "max_ms": 4112.1,
+      "mean_ms": 43.9,
+      "p95_ms": 15.9
+    },
+    "playback_stalls": {
+      "count": 2,
+      "total_ms": 978.3,
+      "longest_ms": 533.8
+    }
+  }
+}
+
+=== TTS harness summary ===
+target: http://127.0.0.1:8000  queue_capacity: 10  clients: 6  burst_extra: 4  repeats: 3
+  [PASS] single_client_streaming_text: 5.2s overloads=0 failures=0 ttfa 44.2-44.2 ms (mean 44.2); chunk gaps 4.6-35.0 ms (mean 9.7, p95 13.7); stalls 0 total 0.0 ms longest 0.0 ms
+         first audio after first part in 44.2 ms (2 chunks before remaining text); 9 parts (3x); 530 chunks total in sequences [0, 1, 2, 3, 4, 5, 6, 7]...
+  [PASS] multiple_concurrent_text: 33.7s overloads=0 failures=0 ttfa 35.3-4313.8 ms (mean 2370.3); chunk gaps 4.8-4112.1 ms (mean 55.5, p95 15.5); stalls 2 total 978.3 ms longest 533.8 ms
+         6 clients completed independent streams (9 parts, 3x)
+  [PASS] burst_exceeds_admission_capacity: 5.0s overloads=3 failures=0 ttfa 32.0-4352.5 ms (mean 1986.2); chunk gaps 6.2-31.0 ms (mean 11.1, p95 19.5); stalls 0 total 0.0 ms longest 0.0 ms
+         capacity=10; in-flight 11 succeeded; overloads=3; overloads counted separately from failures
+         resumed a full stream after burst drained (queued=0, active_jobs=0)
+  [PASS] disconnect_after_first_chunk: 1.8s overloads=0 failures=0 ttfa 31.8-103.0 ms (mean 67.4); chunk gaps 5.3-38.8 ms (mean 9.6, p95 12.4); stalls 0 total 0.0 ms longest 0.0 ms
+         dropping client left after first binary chunk; surviving client completed 177 chunks
+overall: PASS  overloads=3  real_failures=0  stalls=2 total 978.3 ms longest 533.8 ms

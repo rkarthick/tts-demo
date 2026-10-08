@@ -1,0 +1,9 @@
+.git
+.gitignore
+.venv
+venv
+model
+models
+*.wav
+__pycache__
+*.py[cod]

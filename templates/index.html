@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TTS</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: #0b0d12; color: #f7f7f8;
+      display: grid; place-items: center; padding: 32px;
+    }
+    main { width: min(100%, 1000px); display: flex; flex-direction: column; gap: 20px; }
+    .header {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 16px; margin: 0;
+    }
+    h1 { margin: 0; font-size: 32px; }
+    #ttfa {
+      color: #c6c2ff; font-variant-numeric: tabular-nums; font-weight: 650;
+    }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .panel {
+      min-height: 400px; padding: 24px; border: 1px solid #292d38;
+      border-radius: 16px; background: #13161d;
+    }
+    form { height: 100%; display: flex; flex-direction: column; gap: 16px; }
+    label { font-weight: 650; }
+    textarea, select {
+      width: 100%; padding: 12px 16px; border-radius: 10px;
+      border: 1px solid #343947; background: #0d1016; color: inherit;
+      font: inherit;
+    }
+    textarea { flex: 1; resize: none; padding: 16px; line-height: 1.5; }
+    textarea:focus, select:focus { outline: 2px solid #8b7cff; border-color: transparent; }
+    textarea:read-only { opacity: .72; }
+    .slider-row { display: flex; flex-direction: column; gap: 8px; }
+    .slider-line { display: flex; align-items: center; gap: 12px; }
+    input[type="range"] { flex: 1; accent-color: #7868f6; }
+    .append-value { min-width: 5ch; color: #c6c2ff; font-variant-numeric: tabular-nums; }
+    .hint { margin: 0; color: #8b91a1; font-size: 13px; font-weight: 400; }
+    .player {
+      height: 100%; display: flex; flex-direction: column; gap: 14px;
+    }
+    .stream-monitor {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      min-height: 48px; border: 1px solid #292d38; border-radius: 10px;
+      background: #0d1016; color: #a9afbd;
+    }
+    .pulse {
+      width: 10px; height: 10px; border-radius: 50%; background: #7868f6;
+      box-shadow: 0 0 0 0 rgb(120 104 246 / 60%);
+      animation: pulse 1.4s infinite;
+    }
+    @keyframes pulse {
+      70% { box-shadow: 0 0 0 8px rgb(120 104 246 / 0%); }
+      100% { box-shadow: 0 0 0 0 rgb(120 104 246 / 0%); }
+    }
+    #status { min-height: 24px; color: #a9afbd; text-align: center; }
+    .partition-head {
+      display: flex; justify-content: space-between; gap: 12px;
+      color: #a9afbd; font-size: 13px;
+    }
+    .partition-bar {
+      display: flex; gap: 2px; height: 10px; border-radius: 999px; overflow: hidden;
+    }
+    .partition-bar span { min-width: 3px; }
+    .partition {
+      flex: 1; min-height: 160px; overflow: auto; padding: 14px;
+      border: 1px solid #292d38; border-radius: 10px; background: #0d1016;
+      line-height: 1.7; white-space: pre-wrap; word-break: break-word;
+    }
+    .packet {
+      border-radius: 4px; padding: 0 2px;
+      box-decoration-break: clone; -webkit-box-decoration-break: clone;
+    }
+    .packet.active { box-shadow: inset 0 0 0 1px #f7f7f8; }
+    .packet.sent { filter: saturate(1.15); }
+    .log-panel { min-height: 0; }
+    .retry-log {
+      min-height: 140px; max-height: 220px; overflow: auto; padding: 12px 14px;
+      border: 1px solid #292d38; border-radius: 10px; background: #0d1016;
+      font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #c5cad6;
+    }
+    .retry-log .empty { color: #8b91a1; }
+    .retry-log .entry { display: grid; grid-template-columns: 8ch 7ch 1fr; gap: 10px; }
+    .retry-log .stamp { color: #8b91a1; }
+    .retry-log .kind { color: #c6c2ff; font-weight: 650; }
+    @media (max-width: 700px) {
+      body { padding: 20px; }
+      .layout { grid-template-columns: 1fr; }
+      .panel { min-height: 320px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="header">
+      <h1>TTS</h1>
+      <div id="ttfa">Time to first audio —</div>
+    </div>
+    <div class="layout">
+      <section class="panel">
+        <form id="tts-form">
+          <label for="text">Text</label>
+          <textarea id="text" maxlength="50000" placeholder="Type or paste text — it starts speaking in chunks automatically"></textarea>
+          <label for="voice">English voice</label>
+          <select id="voice">__VOICE_OPTIONS__</select>
+          <div class="slider-row">
+            <label for="min-append">Min append</label>
+            <div class="slider-line">
+              <input id="min-append" type="range" min="1" max="__MAX_APPEND__" value="__MAX_APPEND__">
+              <span id="min-append-value" class="append-value">__MAX_APPEND__</span>
+            </div>
+          </div>
+          <div class="slider-row">
+            <label for="max-append">Max append</label>
+            <div class="slider-line">
+              <input id="max-append" type="range" min="1" max="__MAX_APPEND__" value="__MAX_APPEND__">
+              <span id="max-append-value" class="append-value">__MAX_APPEND__</span>
+            </div>
+            <p class="hint">Each packet is a random size between min and max characters.</p>
+          </div>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="player">
+          <div id="status">Connecting…</div>
+          <div class="stream-monitor">
+            <span class="pulse"></span>
+            <span id="stream-detail">Waiting for audio stream</span>
+          </div>
+          <div class="partition-head">
+            <span>Packet sizes</span>
+            <span id="partition-meta">Type or paste text to preview packets</span>
+          </div>
+          <div id="partition-bar" class="partition-bar" hidden></div>
+          <div id="partition" class="partition">Packets will appear here as the text is split.</div>
+        </div>
+      </section>
+    </div>
+    <section class="panel log-panel">
+      <div class="partition-head">
+        <span>Retry log</span>
+        <span id="log-meta">No retries yet</span>
+      </div>
+      <div id="retry-log" class="retry-log"><div class="empty">Retries will appear here.</div></div>
+    </section>
+  </main>
+  <script type="module">
+    import { TtsClient } from "/sdk/tts-client.js";
+
+    const text = document.querySelector("#text");
+    const voice = document.querySelector("#voice");
+    const minAppend = document.querySelector("#min-append");
+    const maxAppend = document.querySelector("#max-append");
+    const minAppendValue = document.querySelector("#min-append-value");
+    const maxAppendValue = document.querySelector("#max-append-value");
+    const status = document.querySelector("#status");
+    const streamDetail = document.querySelector("#stream-detail");
+    const partition = document.querySelector("#partition");
+    const partitionBar = document.querySelector("#partition-bar");
+    const partitionMeta = document.querySelector("#partition-meta");
+    const retryLog = document.querySelector("#retry-log");
+    const logMeta = document.querySelector("#log-meta");
+    const ttfa = document.querySelector("#ttfa");
+
+    const CHUNK_DELAY_MS = 80;
+    const AUTO_SEND_MS = 450;
+    const PACKET_COLORS = [
+      "#3d2f78", "#1f4d4a", "#5a3148", "#2f4a73",
+      "#4a3d1f", "#2f5a38", "#5a2f2f", "#3a3a5a",
+    ];
+
+    const streams = new Map();
+    const activeSources = new Set();
+    let client;
+    let connectGeneration = 0;
+    let audioContext;
+    let nextPlaybackTime = 0;
+    let binaryChain = Promise.resolve();
+    let playbackGeneration = 0;
+    let lastSent = "";
+    let sending = false;
+    let sendTimer = null;
+    let plannedPackets = [];
+    let sentPacketCount = 0;
+    let activePacketIndex = -1;
+    let firstTextAt = null;
+    let firstAudioLogged = false;
+
+    function logRetry(kind, detail) {
+      if (retryLog.querySelector(".empty")) retryLog.replaceChildren();
+      const entry = document.createElement("div");
+      entry.className = "entry";
+      const stamp = document.createElement("span");
+      stamp.className = "stamp";
+      stamp.textContent = new Date().toLocaleTimeString();
+      const label = document.createElement("span");
+      label.className = "kind";
+      label.textContent = kind;
+      const body = document.createElement("span");
+      body.textContent = detail;
+      entry.append(stamp, label, body);
+      retryLog.append(entry);
+      retryLog.scrollTop = retryLog.scrollHeight;
+      const count = retryLog.querySelectorAll(".entry").length;
+      logMeta.textContent = count === 1 ? "1 event" : `${count} events`;
+    }
+
+    function ensureAudioContext() {
+      if (!audioContext) audioContext = new AudioContext();
+      if (audioContext.state === "suspended") audioContext.resume();
+    }
+
+    function finishStreamIfDone(id) {
+      const stream = streams.get(id);
+      if (!stream || !stream.complete || stream.unscheduled || stream.playing) return;
+      streams.delete(id);
+      if (streams.size === 0) {
+        status.textContent = "Playback complete";
+        streamDetail.textContent = "Waiting for audio stream";
+      }
+    }
+
+    async function scheduleChunk(event, generation) {
+      if (generation !== playbackGeneration) return;
+      const stream = streams.get(event.id);
+      if (!stream) throw new Error(`Unknown audio stream ${event.id}`);
+      if (event.sequence !== stream.nextSequence) {
+        throw new Error(
+          `Out-of-order chunk for ${event.id}: expected ${stream.nextSequence}, got ${event.sequence}`
+        );
+      }
+
+      ensureAudioContext();
+      if (generation !== playbackGeneration) return;
+
+      const buffer = audioContext.createBuffer(1, event.pcm.length, stream.sampleRate);
+      buffer.copyToChannel(event.pcm, 0);
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContext.destination);
+      activeSources.add(source);
+
+      const startAt = Math.max(nextPlaybackTime, audioContext.currentTime + 0.03);
+      source.start(startAt);
+      nextPlaybackTime = startAt + buffer.duration;
+      stream.nextSequence += 1;
+      stream.unscheduled -= 1;
+      stream.playing += 1;
+      status.textContent = "Streaming audio";
+      streamDetail.textContent = `${event.id.slice(0, 8)} · chunk ${event.sequence + 1}`;
+
+      source.addEventListener("ended", () => {
+        activeSources.delete(source);
+        stream.playing -= 1;
+        finishStreamIfDone(event.id);
+      });
+    }
+
+    function handleSdkAudio(event) {
+      if (event.type === "start") {
+        streams.set(event.id, {
+          sampleRate: event.sampleRate,
+          nextSequence: 0,
+          unscheduled: 0,
+          playing: 0,
+          complete: false,
+        });
+        return;
+      }
+      if (event.type === "complete") {
+        const stream = streams.get(event.id);
+        if (!stream) throw new Error(`Completion received for unknown stream ${event.id}`);
+        stream.complete = true;
+        finishStreamIfDone(event.id);
+        return;
+      }
+      if (event.type !== "chunk") return;
+      const stream = streams.get(event.id);
+      if (!stream) throw new Error(`Chunk received before stream start for ${event.id}`);
+      stream.unscheduled += 1;
+      if (!firstAudioLogged && firstTextAt !== null) {
+        firstAudioLogged = true;
+        const elapsed = performance.now() - firstTextAt;
+        ttfa.textContent = `Time to first audio ${elapsed.toFixed(1)} ms`;
+      }
+      const generation = playbackGeneration;
+      binaryChain = binaryChain
+        .then(() => scheduleChunk(event, generation))
+        .catch((error) => {
+          status.textContent = error.message;
+        });
+    }
+
+    function handleSdkError(error) {
+      if (error.code === "pending_text_limit") {
+        status.textContent = "Pending text limit reached; retrying the same packet…";
+        logRetry(
+          "retry",
+          `pending ${error.pending}/${error.limit}; rejected ${error.rejected} chars; backoff ${error.retryDelayMs ?? "?"} ms`,
+        );
+        return;
+      }
+      if (error.code === "append_too_large") {
+        status.textContent = "Append is too large; splitting and resending…";
+        const parts = error.pieces?.join(" + ") ?? "?";
+        logRetry("split", `split to ${parts} (max ${error.maxAppend})`);
+        return;
+      }
+      if (error.id) streams.delete(error.id);
+      status.textContent = error.message;
+    }
+
+    function handleSdkEvent(message) {
+      if (message.type === "text_started" || message.type === "text_appended") {
+        status.textContent = "Sending text…";
+      } else if (message.type === "text_caught_up") {
+        status.textContent = "Waiting for more text…";
+      } else if (message.type === "queued") {
+        status.textContent = `Queued at position ${message.position}`;
+      } else {
+        status.textContent = "Generating speech…";
+      }
+    }
+
+    function appendBounds() {
+      const minSize = Math.max(1, Number(minAppend.value) || 1);
+      const maxSize = Math.max(1, Number(maxAppend.value) || 1);
+      return minSize <= maxSize
+        ? { minSize, maxSize }
+        : { minSize: maxSize, maxSize: minSize };
+    }
+
+    function partitionText(script, bounds = appendBounds()) {
+      const packets = [];
+      let offset = 0;
+      const minSize = Math.max(1, bounds.minSize);
+      const maxSize = Math.max(minSize, bounds.maxSize);
+      while (offset < script.length) {
+        const remaining = script.length - offset;
+        const high = Math.min(maxSize, remaining);
+        const low = Math.min(minSize, high);
+        const size = low + Math.floor(Math.random() * (high - low + 1));
+        let end = offset + size;
+        if (end < script.length) {
+          const window = script.slice(offset, end);
+          const breakAt = window.search(/\s+\S*$/);
+          if (breakAt >= Math.max(1, Math.floor(size * 0.35))) {
+            end = offset + breakAt + 1;
+          }
+        }
+        if (end <= offset) end = Math.min(script.length, offset + 1);
+        packets.push(script.slice(offset, end));
+        offset = end;
+      }
+      return packets;
+    }
+
+    function renderPartition(packets, activeIndex = -1, sentCount = 0) {
+      plannedPackets = packets;
+      sentPacketCount = sentCount;
+      activePacketIndex = activeIndex;
+      partition.replaceChildren();
+      partitionBar.replaceChildren();
+      if (!packets.length) {
+        partition.textContent = "Packets will appear here as the text is split.";
+        partitionBar.hidden = true;
+        partitionMeta.textContent = "Type or paste text to preview packets";
+        return;
+      }
+
+      packets.forEach((chunk, index) => {
+        const color = PACKET_COLORS[index % PACKET_COLORS.length];
+        const span = document.createElement("span");
+        span.className = "packet";
+        if (index === activeIndex) span.classList.add("active");
+        if (index < sentCount) span.classList.add("sent");
+        span.style.background = color;
+        span.title = `Packet ${index + 1} · ${chunk.length} chars`;
+        span.textContent = chunk;
+        partition.append(span);
+
+        const bar = document.createElement("span");
+        bar.style.background = color;
+        bar.style.flex = String(Math.max(chunk.length, 1));
+        bar.title = span.title;
+        partitionBar.append(bar);
+      });
+      partitionBar.hidden = false;
+      const sizes = packets.map((chunk) => chunk.length).join(", ");
+      partitionMeta.textContent = `${packets.length} packets · ${sizes} chars`;
+    }
+
+    function previewPartition() {
+      const script = text.value;
+      if (!script) {
+        renderPartition([]);
+        return;
+      }
+      renderPartition(partitionText(script));
+    }
+
+    async function sendTextStream(selectedVoice, packets) {
+      const stream = await client.startStream({
+        voice: selectedVoice,
+        onAudio: handleSdkAudio,
+        onError: handleSdkError,
+        onEvent: handleSdkEvent,
+      });
+
+      for (let index = 0; index < packets.length; index += 1) {
+        renderPartition(packets, index, index);
+        if (firstTextAt === null) firstTextAt = performance.now();
+        await stream.appendText(packets[index]);
+        renderPartition(packets, index, index + 1);
+        if (index + 1 < packets.length) {
+          await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
+        }
+      }
+      await stream.finishText();
+    }
+
+    function scheduleAutoSend() {
+      clearTimeout(sendTimer);
+      sendTimer = setTimeout(() => {
+        autoSend().catch((error) => {
+          sending = false;
+          text.readOnly = false;
+          status.textContent = error.message;
+        });
+      }, AUTO_SEND_MS);
+    }
+
+    async function autoSend() {
+      const script = text.value;
+      if (
+        sending
+        || !script.trim()
+        || script === lastSent
+        || !client?.connected
+      ) {
+        return;
+      }
+
+      sending = true;
+      text.readOnly = true;
+      firstTextAt = null;
+      firstAudioLogged = false;
+      ttfa.textContent = "Time to first audio …";
+      ensureAudioContext();
+
+      try {
+        const packets = plannedPackets.length && plannedPackets.join("") === script
+          ? plannedPackets
+          : partitionText(script);
+        renderPartition(packets, -1, 0);
+        await sendTextStream(voice.value, packets);
+        lastSent = script;
+      } catch (error) {
+        logRetry("error", error.message);
+        throw error;
+      } finally {
+        sending = false;
+        text.readOnly = false;
+      }
+    }
+
+    function cleanupPlayback() {
+      playbackGeneration += 1;
+      for (const source of activeSources) {
+        try { source.stop(); } catch {}
+        source.disconnect();
+      }
+      activeSources.clear();
+      streams.clear();
+      nextPlaybackTime = 0;
+      binaryChain = Promise.resolve();
+      streamDetail.textContent = "Waiting for audio stream";
+      firstTextAt = null;
+      firstAudioLogged = false;
+      ttfa.textContent = "Time to first audio —";
+      previewPartition();
+    }
+
+    function connect() {
+      connectGeneration += 1;
+      const generation = connectGeneration;
+      const previous = client;
+      client = new TtsClient({
+        onClose() {
+          if (generation !== connectGeneration) return;
+          cleanupPlayback();
+          lastSent = "";
+          sending = false;
+          text.readOnly = false;
+          status.textContent = "Disconnected — reconnecting…";
+          setTimeout(connect, 1000);
+        },
+      });
+      previous?.close();
+      client.connect()
+        .then(() => {
+          if (generation !== connectGeneration) return;
+          status.textContent = "Ready";
+          scheduleAutoSend();
+        })
+        .catch(() => {
+          if (generation !== connectGeneration) return;
+          status.textContent = "Disconnected — reconnecting…";
+          setTimeout(connect, 1000);
+        });
+    }
+
+    document.querySelector("#tts-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+    });
+    text.addEventListener("input", () => {
+      previewPartition();
+      scheduleAutoSend();
+    });
+    voice.addEventListener("change", () => {
+      lastSent = "";
+      scheduleAutoSend();
+    });
+    function syncAppendBounds(changed) {
+      const minSize = Number(minAppend.value);
+      const maxSize = Number(maxAppend.value);
+      if (changed === "min" && minSize > maxSize) maxAppend.value = String(minSize);
+      if (changed === "max" && maxSize < minSize) minAppend.value = String(maxSize);
+      minAppendValue.textContent = minAppend.value;
+      maxAppendValue.textContent = maxAppend.value;
+      previewPartition();
+    }
+
+    minAppend.addEventListener("input", () => syncAppendBounds("min"));
+    maxAppend.addEventListener("input", () => syncAppendBounds("max"));
+    minAppend.addEventListener("change", () => {
+      lastSent = "";
+      scheduleAutoSend();
+    });
+    maxAppend.addEventListener("change", () => {
+      lastSent = "";
+      scheduleAutoSend();
+    });
+
+    connect();
+  </script>
+</body>
+</html>
